@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Secure Note- Dashboard</title>
+
+  <!-- Tailwind + Font Awesome + SweetAlert2 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    :root {
+      --bg-start: #f7f8fb;
+      --bg-end: #ffffff;
+      --glass: rgba(255,255,255,0.92);
+      --muted: #64748b;
+    }
+    html,body { height:100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(180deg,var(--bg-start) 0%,var(--bg-end) 60%);
+      min-height: 100vh; margin: 0; -webkit-font-smoothing:antialiased;
+    }
+
+    /* Layout / cards */
+    .note-card { transition: all .22s cubic-bezier(.4,0,.2,1); backdrop-filter: blur(8px); background: rgba(255,255,255,0.92); border-radius: 16px; padding:1rem; min-height:120px; cursor:pointer; box-shadow: 0 6px 18px rgba(20,20,30,0.06); }
+    .note-card:hover{ transform: translateY(-6px); }
+    .glass-effect { background: var(--glass); backdrop-filter: blur(8px); border-radius: 14px; border:1px solid rgba(255,255,255,0.6); }
+    .floating-action { position: fixed; bottom: 1.75rem; right: 1.25rem; z-index:60; width:64px; height:64px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; cursor:pointer; box-shadow: 0 12px 30px rgba(50,50,93,0.12); background: linear-gradient(180deg,#5b6bf6 0%,#6f5af8 100%); color:white; }
+    .note-grid { display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:1rem; }
+
+    /* Modal / composer */
+    .modal-backdrop { background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:9999; padding:1rem; }
+    .composer { width:100%; max-width:980px; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh; background: rgba(255,255,255,0.99); }
+
+    /* Tiny UI */
+    .tag-pill { padding:0.22rem .55rem; background: rgba(0,0,0,0.06); border-radius:999px; font-size:.78rem; display:inline-flex; gap:.4rem; align-items:center; }
+    .color-picker-modern { width:26px; height:26px; border-radius:50%; border:3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.06); cursor:pointer; }
+    .color-picker-selected { box-shadow: 0 0 0 4px rgba(99,102,241,0.18); }
+    .scrollbar-hide::-webkit-scrollbar { display:none } .scrollbar-hide { -ms-overflow-style:none; scrollbar-width:none; }
+
+    /* Sidebar mobile */
+    #sidebar { transition: transform .25s ease; }
+    @media (max-width:1023px) {
+      #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width:84%; max-width:340px; transform: translateX(-110%); z-index:50; }
+      #sidebar.open { transform: translateX(0); }
+    }
+
+    /* Mobile overlay */
+    #mobileOverlay { display:none; position: fixed; inset:0; z-index:45; background: rgba(0,0,0,0.35); }
+    #mobileOverlay.show { display:block; }
+
+    /* Responsive grid tweaks */
+    @media(min-width:640px){ .note-grid{ grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); } }
+
+    /* Tiny helpers */
+    .line-clamp-4 { display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 99999; display: flex; flex-direction: column; gap: 0.5rem; }
+    .toast > div { padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.95); border-radius: 10px; box-shadow:0 8px 20px rgba(2,6,23,0.06); border:1px solid rgba(0,0,0,0.03); }
+  </style>
+</head>
+<body>
+  <!-- mobile overlay (for sidebar) -->
+  <div id="mobileOverlay" aria-hidden="true"></div>
+
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-72 lg:flex flex-col glass-effect relative" aria-label="Main sidebar">
+      <div class="p-5 border-b border-white/20 flex items-center gap-3">
+        <div class="relative">
+          <img id="profileAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=profile" alt="avatar" class="w-12 h-12 rounded-2xl shadow" />
+          <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+        </div>
+        <div>
+          <div id="profileName" class="font-semibold text-base">—</div>
+          <div id="profileEmail" class="text-xs text-slate-500">—</div>
+        </div>
+      </div>
+
+      <nav class="p-4 space-y-2 flex-1 overflow-y-auto scrollbar-hide" role="navigation" aria-label="Notes filters">
+        <button data-filter="all" class="filter-btn w-full text-left px-4 py-3 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center gap-3 font-medium" aria-pressed="true">
+          <i class="fas fa-sticky-note text-indigo-500"></i>
+          <span>All Notes</span>
+          <span class="ml-auto bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full text-xs font-semibold" id="allCount">0</span>
+        </button>
+        <button data-filter="pinned" class="filter-btn w-full text-left px-4 py-3 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center gap-3 font-medium">
+          <i class="fas fa-thumbtack text-amber-500"></i>
+          <span>Pinned</span>
+        </button>
+        <button data-filter="archive" class="filter-btn w-full text-left px-4 py-3 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center gap-3 font-medium">
+          <i class="fas fa-archive text-slate-500"></i>
+          <span>Archive</span>
+        </button>
+        <button data-filter="trash" class="filter-btn w-full text-left px-4 py-3 rounded-xl hover:bg-white/50 transition-all duration-200 flex items-center gap-3 font-medium">
+          <i class="fas fa-trash text-red-500"></i>
+          <span>Trash</span>
+        </button>
+      </nav>
+
+      <div class="p-4 mt-4 border-t border-white/20">
+        <div class="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+          <i class="fas fa-tags"></i>
+          Popular Tags
+        </div>
+        <div id="labels" class="flex gap-2 flex-wrap"></div>
+      </div>
+
+      <div class="p-4 border-t border-white/20">
+        <button id="logoutBtn" class="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 transition-all flex items-center gap-3">
+          <i class="fas fa-sign-out-alt"></i> Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main area -->
+    <main class="flex-1 flex flex-col">
+      <header class="glass-effect border-b border-white/20 p-4 md:p-6 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <button id="menuBtn" class="lg:hidden p-2 rounded-xl hover:bg-white/50 transition-all" aria-label="Toggle menu">
+            <i class="fas fa-bars text-lg"></i>
+          </button>
+
+          <div>
+            <h1 class="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent select-none">Secure Note</h1>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5 select-none">Your modern digital notebook</p>
+          </div>
+        </div>
+
+        <div class="flex-1 px-3 md:px-8">
+          <div class="relative w-full">
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"></i>
+            <input id="search" type="search" placeholder="Search notes, tags, content..." class="w-full pl-10 pr-4 py-2 sm:py-3 rounded-2xl border-0 bg-white/70 backdrop-blur-sm search-focus transition-all duration-200 text-sm" autocomplete="off" aria-label="Search notes" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <button id="profileBtn" class="flex items-center gap-2 p-2 rounded-xl hover:bg-white/50 transition-all" title="User menu" aria-haspopup="true" aria-expanded="false">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=profile" class="w-9 h-9 rounded-lg shadow-sm" alt="profile"/>
+              <i class="fas fa-chevron-down text-xs text-slate-500 hidden sm:inline"></i>
+            </button>
+            <div id="profileMenu" class="hidden absolute right-0 mt-2 w-52 glass-effect rounded-2xl shadow-xl border border-white/20 p-2 z-50" role="menu">
+              <div class="p-3 border-b border-white/20">
+                <div id="profileMenuName" class="font-semibold">—</div>
+                <div id="profileMenuEmail" class="text-sm text-slate-500">—</div>
+              </div>
+              <button id="profileLogout" class="w-full text-left px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 transition-all flex items-center gap-3" role="menuitem">
+                <i class="fas fa-sign-out-alt"></i> Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="flex-1 p-4 sm:p-6 overflow-y-auto scrollbar-hide">
+        <div class="mb-4 sm:mb-6 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 class="text-lg sm:text-2xl font-semibold text-slate-800 select-none">Your Notes</h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1 select-none">Organize your thoughts beautifully</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="sortBtn" class="px-3 py-1 sm:px-4 sm:py-2 rounded-xl bg-white/70 hover:bg-white/90 transition-all flex items-center gap-2 select-none text-sm" title="Sort notes">
+              <i class="fas fa-sort"></i> <span class="hidden sm:inline"> Sort</span>
+            </button>
+            <button id="viewBtn" class="px-3 py-1 sm:px-4 sm:py-2 rounded-xl bg-white/70 hover:bg-white/90 transition-all flex items-center gap-2 select-none text-sm" title="Change view">
+              <i class="fas fa-th-large"></i> <span class="hidden sm:inline"> View</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="noteGrid" class="note-grid" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Create note button -->
+  <button id="newNoteBtn" class="floating-action" title="Create new note" aria-label="New note">
+    <i class="fas fa-plus"></i>
+  </button>
+
+  <!-- Composer modal -->
+  <div id="noteModal" class="modal-backdrop hidden" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="composer">
+      <div class="p-4 sm:p-6 border-b border-white/20 flex items-center justify-between gap-3">
+        <input id="noteTitle" placeholder="Note title..." class="text-lg sm:text-2xl font-semibold bg-transparent border-0 focus:outline-none placeholder-slate-400 flex-1" autocomplete="off" />
+        <div class="flex items-center gap-2">
+          <button id="pinToggle" class="p-2 rounded-xl hover:bg-white/50 transition-all" title="Pin note" aria-pressed="false">
+            <i class="fas fa-thumbtack text-lg"></i>
+          </button>
+          <button id="closeModalBtn" class="p-2 rounded-xl hover:bg-white/50 transition-all" title="Close">
+            <i class="fas fa-times text-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 sm:p-6 flex-1 overflow-auto">
+        <textarea id="noteContent" rows="12" placeholder="Start writing your thoughts..." class="w-full resize-none bg-transparent border-0 focus:outline-none text-base sm:text-lg leading-relaxed placeholder-slate-400 min-h-[200px]"></textarea>
+      </div>
+
+      <div class="p-4 sm:p-6 border-t border-white/20 bg-white/30 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-sm text-slate-600 select-none">Color:</label>
+          <div id="colorPick" class="flex gap-2 items-center"></div>
+
+          <label for="tagInput" class="text-sm text-slate-600 select-none">Add tag:</label>
+          <input id="tagInput" class="px-3 py-1 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm" placeholder="Tag name" autocomplete="off" />
+          <button id="addTagBtn" class="px-3 py-1 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all text-sm select-none">Add</button>
+          <div id="currentTags" class="flex gap-2 items-center"></div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="archiveBtn" class="px-3 py-2 rounded-xl bg-white/70 hover:bg-white/90 transition-all select-none text-sm" title="Archive note">
+            <i class="fas fa-archive mr-2"></i> Archive
+          </button>
+          <button id="saveNoteBtn" class="px-5 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-all select-none text-sm" title="Save note">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast" class="toast" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    /* =================== CONFIG =================== */
+    const API_BASE = 'https://secure-notepad-s3tl.onrender.com'; // change if necessary
+    const TOKEN_KEY = 'noteAuthToken';
+
+    /* =================== STATE =================== */
+    const colorPalette = ['#fff8c6', '#ffd6e0', '#dff7ff', '#e6ffe2', '#f3e8ff', '#ffe8d6'];
+    let notes = [];
+    let currentFilter = 'all';
+    let editingId = null;
+    let currentColor = colorPalette[0];
+    let currentTags = [];
+
+    let searchDebounceTimer = null;
+    let saving = false;
+
+    /* =================== DOM REFS =================== */
+    const noteGrid = document.getElementById('noteGrid');
+    const newNoteBtn = document.getElementById('newNoteBtn');
+    const noteModal = document.getElementById('noteModal');
+    const noteTitle = document.getElementById('noteTitle');
+    const noteContent = document.getElementById('noteContent');
+    const saveNoteBtn = document.getElementById('saveNoteBtn');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const pinToggle = document.getElementById('pinToggle');
+    const colorPick = document.getElementById('colorPick');
+    const addTagBtn = document.getElementById('addTagBtn');
+    const tagInput = document.getElementById('tagInput');
+    const currentTagsWrap = document.getElementById('currentTags');
+    const archiveBtn = document.getElementById('archiveBtn');
+    const searchInput = document.getElementById('search');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+    const allCount = document.getElementById('allCount');
+    const labelsWrap = document.getElementById('labels');
+    const profileBtn = document.getElementById('profileBtn');
+    const profileMenu = document.getElementById('profileMenu');
+    const menuBtn = document.getElementById('menuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const toastWrap = document.getElementById('toast');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const profileLogout = document.getElementById('profileLogout');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+
+    /* =================== HELPERS =================== */
+    const uid = () => 'n_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+    function escapeHtml(text){
+      if (text === undefined || text === null) return '';
+      return String(text).replace(/[&<>"']/g, function (m) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);
+      });
+    }
+    function getIdField(obj){
+      if (!obj) return '';
+      if (typeof obj.id === 'string') return obj.id;
+      if (obj._id) {
+        if (typeof obj._id === 'string') return obj._id;
+        if (obj._id.$oid) return obj._id.$oid;
+      }
+      return String(obj._id || obj.id || '');
+    }
+
+    function showToast(msg, timeout = 2000){
+      const el = document.createElement('div');
+      el.textContent = msg;
+      toastWrap.appendChild(el);
+      setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
+    }
+
+    async function apiFetch(path, opts = {}){
+      const url = API_BASE + path;
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!opts.headers) opts.headers = {};
+      if (opts.body && !opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+      if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(url, opts);
+      return res;
+    }
+
+    /* =================== AUTH & BOOT =================== */
+    function ensureAuthOrRedirect(){
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        window.location.href = './';
+        throw new Error('Redirecting to login');
+      }
+    }
+
+    async function loadProfileAndNotes(){
+      try {
+        ensureAuthOrRedirect();
+        const res = await apiFetch('/api/my-account');
+        const j = await res.json().catch(()=>({}));
+        if (!res.ok || j.error === "true") {
+          localStorage.removeItem(TOKEN_KEY);
+          await Swal.fire({ icon: 'warning', title: 'Session expired', text: j.message || 'Please login again', confirmButtonText: 'OK' });
+          window.location.href = './';
+          return;
+        }
+        const profile = j.data || {};
+        document.getElementById('profileName').innerText = profile.name || '—';
+        document.getElementById('profileEmail').innerText = profile.email || '—';
+        document.getElementById('profileMenuName').innerText = profile.name || '—';
+        document.getElementById('profileMenuEmail').innerText = profile.email || '—';
+        await fetchNotes();
+      } catch (err) {
+        console.error(err);
+        localStorage.removeItem(TOKEN_KEY);
+        try { await Swal.fire({ icon: 'error', title: 'Auth error', text: 'Could not verify your session. Redirecting to login.' }); } catch(e){}
+        window.location.href = './';
+      }
+    }
+
+    /* =================== NOTES API FUNCTIONS =================== */
+    async function fetchNotes(){
+      try {
+        const q = searchInput.value.trim();
+        const res = await apiFetch(`/api/notes?filter=${encodeURIComponent(currentFilter)}${q?('&q='+encodeURIComponent(q)):''}`);
+        if (!res.ok) {
+          const j = await res.json().catch(()=>({}));
+          showToast(j.message || j.error || 'Could not load notes');
+          if (res.status === 401) { localStorage.removeItem(TOKEN_KEY); window.location.href = './'; }
+          return;
+        }
+        const j = await res.json();
+        notes = j.notes || j.data?.notes || (Array.isArray(j) ? j : []);
+        notes = notes.map(n => ({ ...n, id: getIdField(n) }));
+        renderNotes();
+        renderLabels();
+      } catch (err) {
+        console.error(err);
+        showToast('Network error');
+      }
+    }
+
+    async function createNote(payload){
+      const res = await apiFetch('/api/notes', { method: 'POST', body: JSON.stringify(payload) });
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.message || 'Save failed'); }
+      const j = await res.json();
+      return j.note || j.data?.note || j;
+    }
+
+    async function updateNoteAPI(id, payload){
+      const res = await apiFetch(`/api/notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) });
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.message || 'Update failed'); }
+      const j = await res.json();
+      return j.note || j.data?.note || j;
+    }
+
+    async function deleteNoteAPI(id){
+      const res = await apiFetch(`/api/notes/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) { const j = await res.json().catch(()=>({})); throw new Error(j.message || 'Delete failed'); }
+      const j = await res.json();
+      return j;
+    }
+
+    /* =================== RENDER =================== */
+    function renderColorPickers(){
+      colorPick.innerHTML = '';
+      colorPalette.forEach(c => {
+        const dot = document.createElement('div');
+        dot.className = 'color-picker-modern';
+        dot.style.background = c;
+        if (c === currentColor) dot.classList.add('color-picker-selected');
+        dot.addEventListener('click', ()=>{ currentColor = c; renderColorPickers(); });
+        colorPick.appendChild(dot);
+      });
+    }
+
+    function renderCurrentTags(){
+      currentTagsWrap.innerHTML = '';
+      currentTags.forEach((t,i)=>{
+        const pill = document.createElement('div');
+        pill.className = 'tag-pill';
+        pill.innerHTML = `<span>#${escapeHtml(t)}</span><button data-i="${i}" class="ml-2 text-xs" aria-label="remove tag">&times;</button>`;
+        pill.querySelector('button').addEventListener('click', ev=>{ currentTags.splice(+ev.currentTarget.dataset.i,1); renderCurrentTags(); });
+        currentTagsWrap.appendChild(pill);
+      });
+    }
+
+    function renderLabels(){
+      const tagCounts = {};
+      notes.forEach(n => (n.tags||[]).forEach(t => tagCounts[t] = (tagCounts[t]||0)+1));
+      const tags = Object.keys(tagCounts).sort((a,b)=>tagCounts[b]-tagCounts[a]);
+      labelsWrap.innerHTML = '';
+      tags.slice(0,12).forEach(tag=>{
+        const el = document.createElement('div'); el.className='label-item cursor-pointer px-2 py-1 rounded-xl bg-white/60 hover:bg-white/80';
+        el.innerText = `${tag} (${tagCounts[tag]})`;
+        el.addEventListener('click', ()=>{ currentFilter = `tag:${tag}`; fetchNotes(); });
+        labelsWrap.appendChild(el);
+      });
+    }
+
+    function renderNotes(){
+      let list = [...notes];
+      if (currentFilter && currentFilter.startsWith('tag:')) {
+        const tag = currentFilter.split(':')[1];
+        list = list.filter(n => (n.tags||[]).includes(tag) && !n.trashed);
+      } else if (currentFilter === 'pinned') {
+        list = list.filter(n => n.pinned && !n.trashed);
+      } else if (currentFilter === 'archive') {
+        list = list.filter(n => n.archived && !n.trashed);
+      } else if (currentFilter === 'trash') {
+        list = list.filter(n => n.trashed);
+      } else {
+        list = list.filter(n => !n.trashed);
+      }
+
+      list.sort((a,b)=> ((b.pinned?1:0) - (a.pinned?1:0)) || ((b.updatedAt||b.createdAt||0) - (a.updatedAt||a.createdAt||0)));
+      noteGrid.innerHTML = '';
+
+      if (!list.length) {
+        noteGrid.innerHTML = `<div class="col-span-full text-center text-slate-500 p-6 bg-white/40 rounded-2xl">No notes yet, click the + button to create one.</div>`;
+      } else {
+        list.forEach(n=>{
+          const card = document.createElement('div');
+          card.className = 'note-card';
+          card.style.background = n.color || currentColor;
+          const updated = new Date(n.updatedAt || n.createdAt || Date.now()).toLocaleString();
+
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-md sm:text-lg mb-1 truncate">${escapeHtml(n.title || 'Untitled')}</div>
+                <div class="text-sm text-slate-700 mb-2 line-clamp-4 break-words">${escapeHtml((n.content||'').slice(0,300))}${(n.content||'').length>300?'...':''}</div>
+                <div class="flex items-center gap-2 flex-wrap note-tags"></div>
+              </div>
+              <div class="flex flex-col items-end gap-2 ml-2">
+                <div class="flex items-center gap-2">
+                  <button data-id="${n.id}" class="pin-btn p-2 rounded-md" title="${n.pinned ? 'Unpin' : 'Pin'}" aria-pressed="${n.pinned ? 'true' : 'false'}"><i class="fas fa-thumbtack ${n.pinned ? 'text-amber-500' : 'text-slate-500'}"></i></button>
+                  <button data-id="${n.id}" class="edit-btn p-2 rounded-md" title="Edit"><i class="fas fa-pen text-slate-700"></i></button>
+                </div>
+                <div class="text-xs text-slate-600">${n.archived? 'Archived' : ''} ${n.trashed? 'In Trash' : ''} · ${updated}</div>
+              </div>
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-3">
+              <div class="text-xs text-slate-600">${n.isPublic ? 'Public' : ''}</div>
+              <div class="flex items-center gap-2">
+                <button data-id="${n.id}" class="archive-btn px-2 py-1 rounded-md text-sm">${n.archived ? 'Unarchive' : 'Archive'}</button>
+                <button data-id="${n.id}" class="trash-btn px-2 py-1 rounded-md text-sm text-red-600">${n.trashed ? 'Delete' : 'Trash'}</button>
+              </div>
+            </div>
+          `;
+
+          const tagWrap = card.querySelector('.note-tags');
+          (n.tags||[]).forEach(t=>{
+            const tEl = document.createElement('div'); tEl.className='tag-pill cursor-pointer'; tEl.innerText = `#${t}`;
+            tEl.addEventListener('click', ev=>{ ev.stopPropagation(); currentFilter = `tag:${t}`; fetchNotes(); });
+            tagWrap.appendChild(tEl);
+          });
+
+          // Click opens editor (unless click on control)
+          card.addEventListener('click', (e)=>{
+            if (e.target.closest('.pin-btn') || e.target.closest('.edit-btn') || e.target.closest('.archive-btn') || e.target.closest('.trash-btn')) return;
+            openEditor(n.id);
+          });
+
+          // Pin
+          card.querySelectorAll('.pin-btn').forEach(btn=>{
+            btn.addEventListener('click', async ev=>{
+              ev.stopPropagation();
+              await togglePin(btn.dataset.id);
+            });
+          });
+
+          // Edit
+          card.querySelectorAll('.edit-btn').forEach(btn=>{
+            btn.addEventListener('click', ev=>{
+              ev.stopPropagation();
+              openEditor(btn.dataset.id);
+            });
+          });
+
+          // Archive
+          card.querySelectorAll('.archive-btn').forEach(b=>{
+            b.addEventListener('click', async ev=>{
+              ev.stopPropagation();
+              await toggleArchive(b.dataset.id);
+            });
+          });
+
+          // Trash / Delete
+          card.querySelectorAll('.trash-btn').forEach(b=>{
+            b.addEventListener('click', async ev=>{
+              ev.stopPropagation();
+              const id = b.dataset.id;
+              const noteObj = notes.find(x=>x.id === id);
+              if (!noteObj) return;
+              if (noteObj.trashed) {
+                // if already trashed, delete permanently
+                const confirmDelete = await Swal.fire({
+                  title: 'Delete permanently?',
+                  text: 'This cannot be undone.',
+                  icon: 'warning',
+                  showCancelButton: true,
+                  confirmButtonText: 'Delete',
+                  cancelButtonText: 'Cancel'
+                });
+                if (confirmDelete.isConfirmed) {
+                  try { await deleteNoteAPI(id); showToast('Deleted permanently'); await fetchNotes(); } catch(e){ showToast('Delete failed'); }
+                }
+              } else {
+                try { await updateNoteAPI(id, { trashed: true }); showToast('Moved to Trash'); await fetchNotes(); } catch(e){ showToast('Trash failed'); }
+              }
+            });
+          });
+
+          noteGrid.appendChild(card);
+        });
+      }
+
+      const total = notes.filter(n=>!n.trashed).length;
+      allCount.innerText = total;
+    }
+
+    /* =================== ACTIONS =================== */
+    async function togglePin(id){
+      const n = notes.find(x=>x.id === id); if (!n) return;
+      try { await updateNoteAPI(id, { pinned: !n.pinned }); showToast(n.pinned ? 'Unpinned' : 'Pinned'); await fetchNotes(); } catch(e){ showToast('Action failed'); }
+    }
+
+    async function toggleArchive(id){
+      const n = notes.find(x=>x.id === id); if (!n) return;
+      try { await updateNoteAPI(id, { archived: !n.archived }); showToast(!n.archived ? 'Archived' : 'Unarchived'); await fetchNotes(); } catch(e){ showToast('Action failed'); }
+    }
+
+    function openEditor(id){
+      const n = notes.find(x=>x.id === id); if (!n) return;
+      editingId = n.id;
+      noteTitle.value = n.title || '';
+      noteContent.value = n.content || '';
+      currentColor = n.color || colorPalette[0];
+      currentTags = Array.isArray(n.tags) ? [...n.tags] : [];
+      pinToggle.classList.toggle('text-amber-500', !!n.pinned);
+      pinToggle.setAttribute('aria-pressed', !!n.pinned);
+      archiveBtn.dataset.archived = n.archived ? 'true' : 'false';
+      renderColorPickers(); renderCurrentTags();
+      openModal();
+    }
+
+    function openModal(){
+      noteModal.classList.remove('hidden');
+      noteModal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow='hidden';
+      // focus title for quick typing
+      setTimeout(()=>noteTitle.focus(), 120);
+    }
+
+    function closeModal(){
+      noteModal.classList.add('hidden');
+      noteModal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow='';
+      clearComposer();
+    }
+
+    function clearComposer(){
+      noteTitle.value = ''; noteContent.value = ''; editingId = null; currentColor = colorPalette[0]; currentTags = []; renderColorPickers(); renderCurrentTags();
+      pinToggle.classList.remove('text-amber-500'); pinToggle.setAttribute('aria-pressed','false');
+      archiveBtn.dataset.archived = 'false'; tagInput.value = '';
+      saveNoteBtn.disabled = false;
+    }
+
+    saveNoteBtn.addEventListener('click', async ()=>{
+      if (saving) return;
+      const title = noteTitle.value.trim();
+      const content = noteContent.value.trim();
+      if (!title && !content) { showToast('Please add a title or content'); return; }
+      const payload = {
+        title, content, color: currentColor, tags: [...currentTags],
+        pinned: pinToggle.classList.contains('text-amber-500'),
+        archived: archiveBtn.dataset.archived === 'true'
+      };
+      try {
+        saving = true;
+        saveNoteBtn.disabled = true;
+        saveNoteBtn.textContent = 'Saving...';
+        if (editingId) {
+          await updateNoteAPI(editingId, payload);
+          showToast('Note updated');
+        } else {
+          await createNote(payload);
+          showToast('Note created');
+        }
+        closeModal();
+        await fetchNotes();
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Save failed');
+      } finally {
+        saving = false;
+        saveNoteBtn.disabled = false;
+        saveNoteBtn.innerHTML = 'Save';
+      }
+    });
+
+    newNoteBtn.addEventListener('click', ()=>{
+      clearComposer(); openModal();
+    });
+
+    closeModalBtn.addEventListener('click', closeModal);
+    noteModal.addEventListener('click', (e)=>{ if (e.target === noteModal) closeModal(); });
+
+    pinToggle.addEventListener('click', ()=> {
+      const cur = pinToggle.classList.toggle('text-amber-500');
+      pinToggle.setAttribute('aria-pressed', cur ? 'true' : 'false');
+    });
+
+    archiveBtn.addEventListener('click', ()=>{
+      const a = archiveBtn.dataset.archived === 'true';
+      archiveBtn.dataset.archived = (!a).toString();
+      archiveBtn.innerHTML = `<i class="fas fa-archive mr-2"></i> ${!a ? 'Archived' : 'Archive'}`;
+    });
+
+    addTagBtn.addEventListener('click', ()=>{ const t=(tagInput.value||'').trim(); if(!t) return; if(!currentTags.includes(t)) currentTags.push(t); tagInput.value=''; renderCurrentTags(); });
+    tagInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') { e.preventDefault(); addTagBtn.click(); } });
+
+    searchInput.addEventListener('input', () => {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(()=> { fetchNotes(); }, 400);
+    });
+
+    filterBtns.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        filterBtns.forEach(b=>b.classList.remove('bg-white/50'));
+        btn.classList.add('bg-white/50');
+        currentFilter = btn.dataset.filter;
+        fetchNotes();
+      });
+    });
+
+    profileBtn.addEventListener('click', (e)=>{ e.stopPropagation(); profileMenu.classList.toggle('hidden'); const expanded = profileMenu.classList.contains('hidden') ? 'false' : 'true'; profileBtn.setAttribute('aria-expanded', expanded); });
+    document.addEventListener('click', ()=>{ if (!profileMenu.classList.contains('hidden')) profileMenu.classList.add('hidden'); });
+
+    // Mobile menu behavior (overlay + slide-in)
+    menuBtn.addEventListener('click', ()=>{
+      const isOpen = sidebar.classList.toggle('open');
+      if (window.innerWidth < 1024) {
+        mobileOverlay.classList.toggle('show', isOpen);
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+      }
+    });
+    mobileOverlay.addEventListener('click', ()=>{ sidebar.classList.remove('open'); mobileOverlay.classList.remove('show'); document.body.style.overflow = ''; });
+
+    logoutBtn.addEventListener('click', ()=> { localStorage.removeItem(TOKEN_KEY); window.location.href = './'; });
+    profileLogout.addEventListener('click', ()=> { localStorage.removeItem(TOKEN_KEY); window.location.href = './'; });
+
+    document.addEventListener('keydown', (e)=>{
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); newNoteBtn.click(); }
+      else if (e.key === 'Escape') {
+        if (!noteModal.classList.contains('hidden')) closeModal();
+        if (window.innerWidth < 1024 && sidebar.classList.contains('open')) { sidebar.classList.remove('open'); mobileOverlay.classList.remove('show'); document.body.style.overflow = ''; }
+      }
+    });
+
+    /* =================== BOOT =================== */
+    async function boot(){
+      renderColorPickers(); renderCurrentTags();
+      if (!localStorage.getItem(TOKEN_KEY)) { window.location.href = './'; return; }
+      await loadProfileAndNotes();
+      if (window.innerWidth < 1024) { sidebar.classList.remove('open'); mobileOverlay.classList.remove('show'); }
+    }
+    boot();
+  </script>
+</body>
+</html>

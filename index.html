@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Secure Note- Login & Signup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    :root{--card-bg:rgba(255,255,255,0.96)}
+    html,body{height:100%}
+    body{
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#fdfdfd 0%, #f0f0f5 100%);
+      padding:16px
+    }
+    .auth-card{
+      backdrop-filter:blur(8px);
+      background:var(--card-bg);
+      border-radius:24px;
+      box-shadow:0 20px 50px rgba(2,6,23,0.12);
+      overflow:hidden;
+    }
+    .auth-btn { display:block; width:100%; padding:12px 16px; border-radius:12px; font-weight:600; }
+    .auth-btn--primary { background:linear-gradient(90deg,#007aff,#5856d6); color:white; border:none }
+    .login-box{padding:24px; border-radius:16px; background:linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,250,255,0.96)); box-shadow:0 8px 30px rgba(2,6,23,0.06)}
+    @media (min-width: 1024px) {
+      .auth-card { display: grid; grid-template-columns: 420px 1fr; }
+    }
+    @media (max-width:1023px) { .auth-card { width:100%; max-width:720px; } }
+  </style>
+</head>
+<body>
+  <main class="w-full max-w-5xl p-4">
+    <div class="auth-card">
+
+      <!-- LEFT -->
+      <section class="flex items-center justify-center p-6">
+        <div class="w-full max-w-md login-box" id="leftCard">
+          <div class="mb-4 text-center">
+            <h1 class="text-2xl font-bold text-[#007aff]">KeepLike</h1>
+            <p class="text-xs text-slate-500 mt-1">A modern notepad — quick notes & tags</p>
+          </div>
+
+          <!-- Login form -->
+          <form id="leftLogin" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="lEmail">Email</label>
+              <input id="lEmail" type="email" required placeholder="you@example.com" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff]" />
+            </div>
+            <div class="relative">
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="lPass">Password</label>
+              <input id="lPass" type="password" required placeholder="••••••••" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff] pr-12" />
+              <button type="button" aria-label="Toggle password" data-target="lPass" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"><i class="fa fa-eye"></i></button>
+            </div>
+
+            <div class="flex items-center justify-between text-sm">
+              <label class="flex items-center gap-2"><input type="checkbox" class="h-4 w-4"/> <span>Remember me</span></label>
+              <a href="#" class="text-[#007aff] hover:underline">Forgot?</a>
+            </div>
+
+            <div>
+              <button id="leftLoginBtn" type="submit" class="auth-btn auth-btn--primary">Log in</button>
+            </div>
+
+            <div class="text-center text-sm text-slate-600">Don't have an account? <button id="showSignupLeft" type="button" class="text-[#007aff] font-medium hover:underline">Create a new account?</button></div>
+          </form>
+
+          <!-- Signup form -->
+          <form id="leftSignup" class="space-y-4 hidden">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="sName">Full name</label>
+              <input id="sName" type="text" required placeholder="Your name" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff]" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="sEmail">Email</label>
+              <input id="sEmail" type="email" required placeholder="you@example.com" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff]" />
+            </div>
+            <div class="relative">
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="sPass">Password</label>
+              <input id="sPass" type="password" required minlength="6" placeholder="Create a password" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff] pr-12" />
+              <button type="button" aria-label="Toggle password" data-target="sPass" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"><i class="fa fa-eye"></i></button>
+            </div>
+            <div class="relative">
+              <label class="block text-xs font-medium text-slate-600 mb-1" for="sConfirm">Confirm password</label>
+              <input id="sConfirm" type="password" required minlength="6" placeholder="Repeat password" class="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#007aff] pr-12" />
+              <button type="button" aria-label="Toggle password" data-target="sConfirm" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"><i class="fa fa-eye"></i></button>
+            </div>
+
+            <div>
+              <button id="leftSignupBtn" type="submit" class="auth-btn auth-btn--primary">Create account</button>
+            </div>
+
+            <div class="text-center text-sm text-slate-600">Already have an account? <button id="showLoginLeft" type="button" class="text-[#007aff] font-medium hover:underline">Log in</button></div>
+          </form>
+        </div>
+      </section>
+
+      <!-- RIGHT illustration -->
+      <aside class="flex items-center justify-center bg-gradient-to-br from-[#f5f9ff] to-[#e8ecf9] p-8">
+        <div class="max-w-md text-center">
+          <h3 class="text-2xl font-semibold text-slate-700">Welcome to KeepLike</h3>
+          <p class="text-sm text-slate-500 mt-2">Your notes, tags, and ideas — accessible and beautiful.</p>
+        </div>
+      </aside>
+
+    </div>
+  </main>
+
+  <script>
+    const loginForm = document.getElementById("leftLogin");
+    const signupForm = document.getElementById("leftSignup");
+
+    // Toggle login/signup
+    document.getElementById("showSignupLeft").addEventListener("click", () => {
+      loginForm.classList.add("hidden");
+      signupForm.classList.remove("hidden");
+    });
+    document.getElementById("showLoginLeft").addEventListener("click", () => {
+      signupForm.classList.add("hidden");
+      loginForm.classList.remove("hidden");
+    });
+
+    // Toggle password eye
+    document.querySelectorAll("button[data-target]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-target");
+        const input = document.getElementById(targetId);
+        if (input.type === "password") {
+          input.type = "text";
+          btn.innerHTML = '<i class="fa fa-eye-slash"></i>';
+        } else {
+          input.type = "password";
+          btn.innerHTML = '<i class="fa fa-eye"></i>';
+        }
+      });
+    });
+
+    // Auto check token on load
+    async function checkAuth() {
+      const token = localStorage.getItem("noteAuthToken");
+      if (!token) return; // No token, stay on login page
+      try {
+        const res = await fetch("https://secure-notepad-s3tl.onrender.com/api/my-account", {
+          method: "GET",
+          headers: { "Authorization": "Bearer " + token }
+        });
+        const data = await res.json();
+        if (data.error === "false") {
+          window.location.href = "dashboard.html";
+        } else {
+          localStorage.removeItem("noteAuthToken");
+          loginForm.classList.add("hidden");
+          signupForm.classList.remove("hidden");
+        }
+      } catch (err) {
+        localStorage.removeItem("noteAuthToken");
+        loginForm.classList.add("hidden");
+        signupForm.classList.remove("hidden");
+      }
+    }
+    checkAuth();
+
+    // Login
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("lEmail").value.trim();
+      const password = document.getElementById("lPass").value.trim();
+
+      try {
+        const res = await fetch("https://secure-notepad-s3tl.onrender.com/api/user/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (data.error === "false") {
+          localStorage.setItem("noteAuthToken", data.token);
+          Swal.fire("Success", data.message, "success").then(() => {
+            window.location.href = "dashboard.html";
+          });
+        } else {
+          Swal.fire("Error", data.message, "error");
+        }
+      } catch (err) {
+        Swal.fire("Error", "Something went wrong!", "error");
+      }
+    });
+
+    // Signup
+    signupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = document.getElementById("sName").value.trim();
+      const email = document.getElementById("sEmail").value.trim();
+      const password = document.getElementById("sPass").value.trim();
+      const confirm = document.getElementById("sConfirm").value.trim();
+
+      if (password !== confirm) {
+        return Swal.fire("Error", "Passwords do not match!", "error");
+      }
+
+      try {
+        const res = await fetch("https://secure-notepad-s3tl.onrender.com/api/user/registration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (data.error === "false") {
+          Swal.fire("Success", data.message, "success").then(() => {
+            loginForm.classList.remove("hidden");
+            signupForm.classList.add("hidden");
+            document.getElementById("lEmail").value = email;
+          });
+        } else {
+          Swal.fire("Error", data.message, "error");
+        }
+      } catch (err) {
+        Swal.fire("Error", "Something went wrong!", "error");
+      }
+    });
+  </script>
+</body>
+</html>
